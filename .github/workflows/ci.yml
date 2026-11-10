@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python (lint + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            analysis/pyproject.toml
+            server/pyproject.toml
+
+      - name: Install packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "./analysis[dev]" -e "./server[dev]"
+
+      - name: Ruff (lint)
+        run: ruff check analysis server scripts
+
+      - name: Black (format check)
+        run: black --check analysis server scripts
+
+      - name: Cache MediaPipe model
+        uses: actions/cache@v4
+        with:
+          path: analysis/models
+          key: mediapipe-models-${{ hashFiles('scripts/download_models.py') }}
+
+      - name: Download pose model (for pipeline smoke tests)
+        run: python scripts/download_models.py full
+
+      - name: Test analysis core
+        working-directory: analysis
+        run: pytest -q
+
+      - name: Test server
+        working-directory: server
+        run: pytest -q
+
+  mobile:
+    name: Mobile (lint + typecheck + tests)
+    runs-on: ubuntu-latest
+    # The Expo app is added in Phase 5; skip cleanly until it exists.
+    if: ${{ hashFiles('mobile/package.json') != '' }}
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test -- --ci

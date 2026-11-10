@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "parspective-server"
+version = "0.1.0"
+description = "FastAPI service wrapping the parspective analysis core."
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    # The analysis core is installed from ../analysis (editable in dev, copied in Docker).
+    "parspective",
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.30,<1",
+    "python-multipart>=0.0.9",
+    "pydantic-settings>=2.4,<3",
+    "email-validator>=2.1,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6", "black>=24"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

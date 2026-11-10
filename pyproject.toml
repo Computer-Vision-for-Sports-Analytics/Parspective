@@ -1,0 +1,22 @@
+# Repository-wide Python tooling config (ruff + black).
+# This file has no [project] table: the installable packages live in analysis/ and server/.
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["mobile", ".venv"]
+
+[tool.ruff.lint]
+# E/F: pycodestyle + pyflakes, I: import sorting, B: bugbear, UP: pyupgrade, N: naming, SIM: simplify
+select = ["E", "F", "I", "B", "UP", "N", "SIM"]
+ignore = [
+    "E501", # line length is handled by black
+    "B008", # FastAPI's Depends()/File() in defaults is idiomatic
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["parspective", "app"]

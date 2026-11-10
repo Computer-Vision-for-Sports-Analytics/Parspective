@@ -218,3 +218,44 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---------------------------------------------------------------------------
+# Parspective Mobile additions
+# ---------------------------------------------------------------------------
+# NOTE: the template above ignores `lib/` and `var/` everywhere. Avoid those
+# folder names in this repo (e.g. use `mobile/src/` rather than `mobile/lib/`).
+
+# MediaPipe model files (download with scripts/download_models.py)
+analysis/models/
+*.task
+*.part
+
+# Sample/benchmark videos and outputs: they contain recordings of people. Keep them out of git.
+samples/*
+!samples/README.md
+*.mp4
+*.mov
+*.webm
+result*.json
+benchmark-results/
+
+# Server runtime data (uploads, job results)
+server/data/
+
+# Node / Expo
+node_modules/
+.expo/
+.expo-shared/
+dist-web/
+web-build/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+mobile/ios/
+mobile/android/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

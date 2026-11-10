@@ -1,0 +1,11 @@
+# Parspective Mobile analysis configuration.
+#
+# Every value here is a PROVISIONAL engineering default chosen by the student team.
+# None of these come from SAS / the original Parspective system (see docs/open-questions.md).
+# Change values here, not in code. The full set of keys is filled in during Phase 2/3.
+
+config_version: 1
+
+pose:
+  # MediaPipe PoseLandmarker model variant: lite | full | heavy (speed vs. accuracy).
+  model: full

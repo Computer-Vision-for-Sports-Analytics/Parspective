@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "parspective"
+version = "0.1.0"
+description = "Parspective Mobile analysis core: single-camera putting analysis (pose -> phases -> metrics)."
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+license = { text = "Proprietary - CSC 4610 capstone / SAS" }
+dependencies = [
+    # MediaPipe Tasks API (PoseLandmarker). 0.10.x is the line that ships the Tasks API.
+    # Tested with 0.10.35. NOTE: mediapipe already depends on `opencv-contrib-python`, which
+    # provides `cv2`. Do NOT also add opencv-python(-headless): two packages fighting over the
+    # same `cv2` module causes confusing import errors. (The Docker image handles the headless swap.)
+    "mediapipe>=0.10.30,<0.11",
+    "numpy>=1.26,<3",
+    "scipy>=1.11,<2",
+    "pydantic>=2.6,<3",
+    "pyyaml>=6.0,<7",
+    # Bundles a static ffmpeg binary so the overlay can be encoded as H.264 without a system install.
+    "imageio-ffmpeg>=0.5,<0.7",
+    "typer>=0.12,<1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6", "black>=24"]
+
+[project.scripts]
+parspective = "parspective.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["parspective"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"config/metrics.yaml" = "parspective/_default_config/metrics.yaml"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["model: requires a downloaded MediaPipe model file (skipped otherwise)"]
