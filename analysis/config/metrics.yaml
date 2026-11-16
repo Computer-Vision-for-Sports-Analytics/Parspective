@@ -2,10 +2,47 @@
 #
 # Every value here is a PROVISIONAL engineering default chosen by the student team.
 # None of these come from SAS / the original Parspective system (see docs/open-questions.md).
-# Change values here, not in code. The full set of keys is filled in during Phase 2/3.
+# Change values here, not in code. Unknown keys are rejected so typos fail loudly.
+#
+# Units: "sw" = shoulder widths (distances are divided by the golfer's median shoulder width
+# so they don't depend on how far the phone is from the golfer).
 
 config_version: 1
 
 pose:
   # MediaPipe PoseLandmarker model variant: lite | full | heavy (speed vs. accuracy).
   model: full
+  min_pose_detection_confidence: 0.5
+  min_pose_presence_confidence: 0.5
+  min_tracking_confidence: 0.5
+
+signal:
+  # Wrist landmarks below this MediaPipe visibility score are treated as missing.
+  min_visibility: 0.5
+  # Missing stretches up to this long are filled by interpolation. A stroke whose
+  # takeaway->impact span contains a longer gap is rejected.
+  max_gap_ms: 200
+  # Savitzky-Golay smoothing of the hand position (window is rounded to an odd frame count).
+  smoothing_window_ms: 250
+  smoothing_polyorder: 2
+
+phases:
+  # A backswing must take the hands at least this far from address to count as a stroke
+  # (filters out waggles and small adjustments).
+  min_backswing_length_sw: 0.2
+  # Takeaway = the moment hand speed first exceeds this fraction of the peak backswing speed.
+  takeaway_velocity_fraction: 0.10
+  # Top = midpoint between the backswing stopping (speed < this fraction of peak backswing
+  # speed) and the forward swing starting (speed > this fraction of peak forward speed).
+  # Robust to a pause at the top; the pause length is reported as transition_ms.
+  top_velocity_fraction: 0.20
+  # Finish = the moment hand speed drops below this fraction of the peak forward-swing speed.
+  finish_velocity_fraction: 0.10
+  # Address position = median hand position over this window just before takeaway.
+  address_window_ms: 300
+  # Plausibility limits; strokes outside them are rejected with a warning.
+  min_backswing_ms: 200
+  max_backswing_ms: 3000
+  min_forward_swing_ms: 100
+  max_forward_swing_ms: 2000
+

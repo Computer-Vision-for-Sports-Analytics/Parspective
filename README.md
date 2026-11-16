@@ -63,7 +63,7 @@ python scripts/download_models.py          # MediaPipe pose model -> analysis/mo
 Analyze a video from the command line:
 
 ```bash
-python -m parspective analyze samples/putt.mp4 --hand right --out result.json --overlay out.mp4
+python -m parspective analyze samples/putt.mp4 --hand right   # -> results/putt/result.json + overlay.mp4
 ```
 
 Run the API server:

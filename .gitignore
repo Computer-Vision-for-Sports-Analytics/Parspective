@@ -239,6 +239,10 @@ samples/*
 result*.json
 benchmark-results/
 
+# Analysis output (python -m parspective analyze): overlays show real people.
+results/*
+!results/README.md
+
 # Server runtime data (uploads, job results)
 server/data/
 

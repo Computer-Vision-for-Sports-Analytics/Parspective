@@ -6,7 +6,7 @@ These are decisions the team can't make alone. Until SAS answers, the team's **a
 |---|----------|----------------|---------------------------|--------|
 | Q1 | Which metrics are in scope for the single-camera version? | Decides what to build in Iterations 2–3 | Shoulder tilt, tempo, stroke length ratio, head movement (stretch) | Open |
 | Q2 | How does Parspective define each metric exactly (reference points, sign conventions, phase boundaries)? | Our numbers are only comparable if the definitions match | Our own provisional definitions, documented in [metrics.md](metrics.md) | Open (spike SP 01) |
-| Q3 | How do you define the stroke events (takeaway, top, impact, finish)? Is impact the ball-contact frame or the return to address? | Tempo depends directly on these | Impact = hands return to the address position (no ball/putter tracking yet) | Open |
+| Q3 | How do you define the stroke events (takeaway, top, impact, finish)? Is impact the ball-contact frame or the return to address? | Tempo depends directly on these | Takeaway = 10% of peak backswing speed; top = midpoint of the pause at the top; impact = hands return to the address position (no ball/putter tracking yet). See [metrics.md](metrics.md#stroke-phases) | Open |
 | Q4 | What accuracy tolerance per metric counts as "matches Parspective"? | Pass/fail criterion for SP 02 | Tilt ±2°, tempo ratio ±0.2, stroke length ratio ±0.15 (placeholders) | Open |
 | Q5 | How should the combined score (US 04) be weighted, and what are the target values? | The current score is a placeholder | Equal-ish weights; targets: tempo 2.0, tilt change 0°, length ratio 1.0 | Open |
 | Q6 | Can we get sample videos with Parspective reference outputs? | Needed for SP 02 | None available yet; synthetic tests only | Open |

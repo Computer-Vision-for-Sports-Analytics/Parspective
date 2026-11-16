@@ -1,11 +1,23 @@
+"""Pose extraction: video file -> MediaPipe PoseLandmarker landmarks per frame."""
+
+from __future__ import annotations
+
+import csv
+import os
+from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
-import mediapipe as mp
-from pathlib import Path
-import csv
+import numpy as np
 
+from .config import PoseConfig
 
-# Pairs of landmarks that form the skeleton
+#: MediaPipe landmark indices used by the analysis.
+LEFT_SHOULDER, RIGHT_SHOULDER = 11, 12
+LEFT_WRIST, RIGHT_WRIST = 15, 16
+NUM_LANDMARKS = 33
+
+#: Pairs of landmarks drawn as the skeleton in the overlay.
 CONNECTIONS = [
     (11, 12),  # Shoulders
     (11, 13),  # Left shoulder to elbow
@@ -21,205 +33,137 @@ CONNECTIONS = [
     (26, 28),  # Right knee to ankle
 ]
 
-
-# MediaPipe classes
-BaseOptions = mp.tasks.BaseOptions
-PoseLandmarker = mp.tasks.vision.PoseLandmarker
-PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
-RunningMode = mp.tasks.vision.RunningMode
+#: Default model folder (``analysis/models``); ``PARSPECTIVE_MODEL_DIR`` overrides it.
+DEFAULT_MODEL_DIR = Path(__file__).resolve().parents[1] / "models"
 
 
-# Locate the project files
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+@dataclass
+class PoseSequence:
+    """Landmarks for every decoded frame of one video.
 
-MODEL_PATH = (
-    PROJECT_ROOT
-    / "analysis"
-    / "models"
-    / "pose_landmarker_lite.task"
-)
+    ``landmarks`` has shape ``(n_frames, 33, 4)`` holding normalized ``x, y, z, visibility``.
+    Frames where no person was detected are all-NaN.
+    """
 
-VIDEO_PATH = PROJECT_ROOT / "samples" / "putt.mp4"
+    timestamps_ms: np.ndarray
+    landmarks: np.ndarray
+    fps: float
+    width: int
+    height: int
+    model: str
 
+    @property
+    def frame_count(self) -> int:
+        return len(self.timestamps_ms)
 
-# Configure MediaPipe
-options = PoseLandmarkerOptions(
-    base_options=BaseOptions(
-        model_asset_path=str(MODEL_PATH)
-    ),
-    running_mode=RunningMode.VIDEO,
-    num_poses=1
-)
-
-
-# Open the putting video
-video = cv2.VideoCapture(str(VIDEO_PATH))
-
-if not video.isOpened():
-    raise RuntimeError("Could not open putting video")
+    @property
+    def detected(self) -> np.ndarray:
+        """Boolean mask of frames where a pose was detected."""
+        return ~np.isnan(self.landmarks[:, 0, 0])
 
 
-# Get the video's frame rate
-fps = video.get(cv2.CAP_PROP_FPS)
-
-if fps <= 0:
-    fps = 30
-
-frame_number = 0
-
-# Set up the landmark CSV output
-CSV_PATH = PROJECT_ROOT / "samples" / "putt_landmarks.csv"
-
-csv_file = open(CSV_PATH, "w", newline="", encoding="utf-8")
-csv_writer = csv.writer(csv_file)
-
-csv_writer.writerow([
-    "frame",
-    "timestamp_ms",
-    "landmark_id",
-    "x",
-    "y",
-    "z",
-    "visibility"
-])
-
-# Get the original video dimensions
-width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
-height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-# Set up the output video
-OUTPUT_PATH = PROJECT_ROOT / "samples" / "putt_overlay.mp4"
-
-fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-
-out = cv2.VideoWriter(
-    str(OUTPUT_PATH),
-    fourcc,
-    fps,
-    (width, height)
-)
-
-if not out.isOpened():
-    video.release()
-    raise RuntimeError("Could not create output video")
+def resolve_model_path(variant: str, model_dir: str | Path | None = None) -> Path:
+    """Locate ``pose_landmarker_<variant>.task``, or explain how to download it."""
+    folder = Path(model_dir or os.environ.get("PARSPECTIVE_MODEL_DIR", DEFAULT_MODEL_DIR))
+    path = folder / f"pose_landmarker_{variant}.task"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"MediaPipe model not found at {path}. "
+            f"Run: python scripts/download_models.py {variant}"
+        )
+    return path
 
 
-# Load the AI model
-try:
-    with PoseLandmarker.create_from_options(options) as landmarker:
+def _frame_timestamps(raw_ms: list[float], fps: float) -> np.ndarray:
+    """Use the container's timestamps when they are usable, else derive them from fps.
 
-        print("Pose detection model loaded successfully!")
+    Phone videos are often variable-frame-rate, so ``frame_index / fps`` can drift.
+    Some OpenCV backends report 0 for every frame, which is why there's a fallback.
+    """
+    ts = np.asarray(raw_ms, dtype=float)
+    if len(ts) > 1 and np.all(np.diff(ts) > 0):
+        return ts - ts[0]
+    return np.arange(len(ts), dtype=float) * 1000.0 / fps
 
-        # Process each frame
-        while True:
-            success, frame = video.read()
 
-            if not success:
-                break
+def extract_pose(
+    video_path: str | Path,
+    config: PoseConfig | None = None,
+    model_path: str | Path | None = None,
+) -> PoseSequence:
+    """Run MediaPipe PoseLandmarker over every frame of ``video_path``."""
+    import mediapipe as mp  # imported lazily: heavy, and not needed by the pure-math modules
 
-            # Convert OpenCV's BGR image to RGB
-            rgb_frame = cv2.cvtColor(
-                frame,
-                cv2.COLOR_BGR2RGB
-            )
+    config = config or PoseConfig()
+    model_path = Path(model_path) if model_path else resolve_model_path(config.model)
 
-            # Convert frame into a MediaPipe image
-            mp_image = mp.Image(
-                image_format=mp.ImageFormat.SRGB,
-                data=rgb_frame
-            )
+    video = cv2.VideoCapture(str(video_path))
+    if not video.isOpened():
+        raise RuntimeError(f"Could not open video: {video_path}")
 
-            # Calculate timestamp in milliseconds
-            timestamp_ms = int(frame_number * 1000 / fps)
-            frame_number += 1
+    fps = video.get(cv2.CAP_PROP_FPS)
+    if not fps or fps <= 0 or not np.isfinite(fps):
+        fps = 30.0
 
-            # Run AI pose detection
-            result = landmarker.detect_for_video(
-                mp_image,
-                timestamp_ms
-            )
+    options = mp.tasks.vision.PoseLandmarkerOptions(
+        base_options=mp.tasks.BaseOptions(model_asset_path=str(model_path)),
+        running_mode=mp.tasks.vision.RunningMode.VIDEO,
+        num_poses=1,
+        min_pose_detection_confidence=config.min_pose_detection_confidence,
+        min_pose_presence_confidence=config.min_pose_presence_confidence,
+        min_tracking_confidence=config.min_tracking_confidence,
+    )
 
-            # Draw skeleton if a person was detected
-            if result.pose_landmarks:
-
-                landmarks = result.pose_landmarks[0]
-
+    raw_ts: list[float] = []
+    frames: list[np.ndarray] = []
+    width = height = 0
+    last_mp_ts = -1
+    try:
+        with mp.tasks.vision.PoseLandmarker.create_from_options(options) as landmarker:
+            while True:
+                ok, frame = video.read()
+                if not ok:
+                    break
                 height, width = frame.shape[:2]
+                ts = video.get(cv2.CAP_PROP_POS_MSEC)
+                raw_ts.append(ts)
 
-                # Save all 33 landmarks for this frame
-                for index, landmark in enumerate(landmarks):
-                    csv_writer.writerow([
-                        frame_number - 1,
-                        timestamp_ms,
-                        index,
-                        landmark.x,
-                        landmark.y,
-                        landmark.z,
-                        landmark.visibility
-                    ])
+                # MediaPipe needs strictly increasing integer timestamps. Fall back to the
+                # nominal frame time when the backend doesn't report one.
+                if ts <= 0 and len(raw_ts) > 1:
+                    ts = (len(raw_ts) - 1) * 1000.0 / fps
+                mp_ts = max(last_mp_ts + 1, int(round(ts)))
+                last_mp_ts = mp_ts
 
-                # Draw green lines between joints
-                for start, end in CONNECTIONS:
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+                result = landmarker.detect_for_video(image, mp_ts)
 
-                    point1 = landmarks[start]
-                    point2 = landmarks[end]
+                values = np.full((NUM_LANDMARKS, 4), np.nan)
+                if result.pose_landmarks:
+                    for i, lm in enumerate(result.pose_landmarks[0]):
+                        values[i] = (lm.x, lm.y, lm.z, lm.visibility)
+                frames.append(values)
+    finally:
+        video.release()
 
-                    x1 = int(point1.x * width)
-                    y1 = int(point1.y * height)
+    landmarks = np.stack(frames) if frames else np.empty((0, NUM_LANDMARKS, 4))
+    return PoseSequence(
+        timestamps_ms=_frame_timestamps(raw_ts, fps),
+        landmarks=landmarks,
+        fps=float(fps),
+        width=width,
+        height=height,
+        model=config.model,
+    )
 
-                    x2 = int(point2.x * width)
-                    y2 = int(point2.y * height)
 
-                    cv2.line(
-                        frame,
-                        (x1, y1),
-                        (x2, y2),
-                        (0, 255, 0),
-                        4
-                    )
-
-                # Draw red circles on the joints
-                for index in range(11, 29):
-
-                    landmark = landmarks[index]
-
-                    x = int(landmark.x * width)
-                    y = int(landmark.y * height)
-
-                    cv2.circle(
-                        frame,
-                        (x, y),
-                        7,
-                        (0, 0, 255),
-                        -1
-                    )
-
-            # Save the frame with the skeleton overlay
-            out.write(frame)
-
-            # Resize the video for display
-            display_frame = cv2.resize(
-                frame,
-                None,
-                fx=0.5,
-                fy=0.5
-            )
-
-            # Display the video with skeleton
-            cv2.imshow(
-                "PuttR Pose Overlay",
-                display_frame
-            )
-
-            # Press Q to stop playback
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
-
-finally:
-    # Release video and close windows
-    video.release()
-    out.release()
-    csv_file.close()
-    cv2.destroyAllWindows()
-
-print("Video processing finished!")
+def write_landmarks_csv(seq: PoseSequence, path: str | Path) -> None:
+    """Write one row per (frame, landmark), for frames where a pose was detected."""
+    with Path(path).open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["frame", "timestamp_ms", "landmark_id", "x", "y", "z", "visibility"])
+        for frame_idx in np.flatnonzero(seq.detected):
+            ts = round(float(seq.timestamps_ms[frame_idx]), 3)
+            for lm_idx, (x, y, z, vis) in enumerate(seq.landmarks[frame_idx]):
+                writer.writerow([int(frame_idx), ts, lm_idx, x, y, z, vis])
