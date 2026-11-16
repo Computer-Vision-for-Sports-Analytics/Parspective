@@ -2,6 +2,7 @@
 import cv2
 import mediapipe as mp
 from pathlib import Path
+import csv
 
 
 # Pairs of landmarks that form the skeleton
@@ -66,6 +67,22 @@ if fps <= 0:
 
 frame_number = 0
 
+# Set up the landmark CSV output
+CSV_PATH = PROJECT_ROOT / "samples" / "putt_landmarks.csv"
+
+csv_file = open(CSV_PATH, "w", newline="", encoding="utf-8")
+csv_writer = csv.writer(csv_file)
+
+csv_writer.writerow([
+    "frame",
+    "timestamp_ms",
+    "landmark_id",
+    "x",
+    "y",
+    "z",
+    "visibility"
+])
+
 # Get the original video dimensions
 width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -129,6 +146,18 @@ try:
 
                 height, width = frame.shape[:2]
 
+                # Save all 33 landmarks for this frame
+                for index, landmark in enumerate(landmarks):
+                    csv_writer.writerow([
+                        frame_number - 1,
+                        timestamp_ms,
+                        index,
+                        landmark.x,
+                        landmark.y,
+                        landmark.z,
+                        landmark.visibility
+                    ])
+
                 # Draw green lines between joints
                 for start, end in CONNECTIONS:
 
@@ -190,6 +219,7 @@ finally:
     # Release video and close windows
     video.release()
     out.release()
+    csv_file.close()
     cv2.destroyAllWindows()
 
 print("Video processing finished!")
