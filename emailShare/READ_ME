@@ -1,0 +1,33 @@
+Author Max Beaty:
+
+I created two python files (ShareScreen and ShareService)
+
+ShareScreen: Builds the screen interface that allows the customer to enter their email in
+There are some checks in there to make sure that it is an email being entered in.
+It will send when selected send or for Keyboard (enter) 
+There is also a skip feature that just removes the page.
+
+[IMPORTANT]Flet is imported and needs to be installed before testing.
+the cmd to install is : python3 -m pip install flet
+
+ShareService is built to interact with the api. it opens and upload the stats and the video
+there is some error checking for instance if the stats/video were unable to be opened or if the there it freezes.
+ShareService was built to test and to later deploy. Mock can be set to True when testing or False when it actually needs to pull files from the API
+I tried to comment as best I could the things that needed to be changed for Prod
+
+[THE ULTIMATE TEST]
+To go a step further with my testing I found a precoded api that I went through and tailored it to work with this project. I had "putt.api" folder containing api.py. I then created a key using resend.com and used my local pc as an acting server by running:
+
+[CMD_to_run]
+export RESEND_API_KEY="what the Key was"
+python3 -m uvicorn api:app --reload --port 8000
+
+on the the Email_forwarding_Feature I set I ran 
+python3 main.py
+
+After this I entered in my email to the interface that was created in ShareScreen and then recieved an email.
+
+[side_note]:
+Also to mention I added two example files in the ShareService "putt_stats.json" and "putt.mp4" these were just used to test if I could recieve them in the email.
+
+The email that came through after the test contained what was expected!
