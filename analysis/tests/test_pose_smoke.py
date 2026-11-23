@@ -43,6 +43,7 @@ def test_video_without_a_person(tmp_path):
     assert result.video.frame_count == 20
     assert result.pose.frames_with_pose == 0
     assert result.strokes == []
+    assert result.tempo_summary.stroke_count == 0
     assert overlay.stat().st_size > 0
     assert csv_path.read_text(encoding="utf-8").startswith("frame,timestamp_ms")
 
@@ -53,7 +54,6 @@ def test_local_sample_putt():
 
     result = analyze(SAMPLE, hand="right")
     assert result.pose.detection_rate > 0.9
-    assert len(result.strokes) >= 1
+    assert result.tempo_summary.stroke_count >= 1
     for s in result.strokes:
-        p = s.phases
-        assert p.takeaway.time_ms < p.top.time_ms < p.impact.time_ms
+        assert 1.0 < s.tempo.ratio < 3.5

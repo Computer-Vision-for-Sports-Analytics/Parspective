@@ -11,14 +11,14 @@ python -m parspective analyze putt.mp4 --hand right   # -> results/putt/result.j
 pytest
 ```
 
-The command finds every putting stroke in the video and prints its phase times (address, takeaway, top, impact, finish). Options:
+The command prints a tempo report for every stroke in the video, plus a consistency verdict when there are two or more strokes. Record several putts in a row to get that verdict. Options:
 
 | Option | What it does |
 |--------|-------------|
 | `--hand right\|left` | Golfer's handedness (default `right`) |
 | `--out-dir DIR` | Folder for `result.json` and `overlay.mp4` (default `results/<video name>/`) |
 | `--out file.json` | Write the result JSON here instead (schema in `parspective/result.py`) |
-| `--overlay file.mp4` | Write the H.264 overlay (skeleton, current phase) here instead |
+| `--overlay file.mp4` | Write the H.264 overlay (skeleton, current phase, tempo per stroke) here instead |
 | `--no-overlay` | Skip the overlay video (faster) |
 | `--landmarks-csv lm.csv` | Write raw per-frame landmarks |
 | `--config my.yaml` | Use a different `metrics.yaml` |
@@ -28,7 +28,7 @@ From Python:
 ```python
 from parspective import analyze
 result = analyze("putt.mp4", hand="right")
-print(len(result.strokes), "strokes")
+print(result.tempo_summary.message)
 ```
 
 | Module | Role |
@@ -36,10 +36,12 @@ print(len(result.strokes), "strokes")
 | `pose.py` | Video → MediaPipe landmarks per frame (with real frame timestamps) |
 | `trajectory.py` | Landmarks → clean, smoothed hand position along the target line |
 | `phases.py` | Hand trajectory → address / takeaway / top / impact / finish per stroke |
-| `metrics.py` | Phases + landmarks → per-stroke metrics (shoulder tilt, stroke length, …: to be added) |
+| `metrics.py` | Phases → tempo per stroke and consistency across strokes |
 | `result.py` | Result JSON schema (pydantic) |
 | `pipeline.py` | Wires it together (`analyze`, `analyze_pose`) |
 | `overlay.py`, `cli.py` | Overlay video, command line |
+
+For a diagram of how a video moves through these modules, see [FLOW.md](FLOW.md).
 
 Tests in `tests/` use synthetic strokes with known timing (`tests/synthetic.py`), so they don't need a model or a video. Tests marked `model` run MediaPipe and are skipped if the model isn't downloaded.
 

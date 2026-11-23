@@ -46,3 +46,12 @@ phases:
   min_forward_swing_ms: 100
   max_forward_swing_ms: 2000
 
+tempo:
+  # Target backswing:forward-swing ratio and the band counted as "in range" (Q4/Q5).
+  target_ratio: 2.0
+  target_tolerance: 0.2
+  # Several strokes count as "consistent" if the standard deviation of their ratios is
+  # at most this.
+  consistency_max_ratio_sd: 0.15
+  # Below this frame rate the result carries a timing-resolution warning.
+  low_fps_warning: 50

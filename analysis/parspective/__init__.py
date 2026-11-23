@@ -4,7 +4,7 @@ Pipeline: video file -> pose landmarks per frame -> smoothing -> stroke phases -
 
     from parspective import analyze
     result = analyze("putt.mp4", hand="right", overlay_path="out.mp4")
-    print(len(result.strokes), "strokes found")
+    print(result.tempo_summary.message)
 """
 
 __version__ = "0.1.0"

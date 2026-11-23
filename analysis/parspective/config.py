@@ -44,11 +44,19 @@ class PhasesConfig(_Section):
     max_forward_swing_ms: float = Field(2000, gt=0)
 
 
+class TempoConfig(_Section):
+    target_ratio: float = Field(2.0, gt=0)
+    target_tolerance: float = Field(0.2, ge=0)
+    consistency_max_ratio_sd: float = Field(0.15, ge=0)
+    low_fps_warning: float = Field(50, ge=0)
+
+
 class AnalysisConfig(_Section):
     config_version: int = 1
     pose: PoseConfig = PoseConfig()
     signal: SignalConfig = SignalConfig()
     phases: PhasesConfig = PhasesConfig()
+    tempo: TempoConfig = TempoConfig()
 
 
 def default_config_path() -> Path:

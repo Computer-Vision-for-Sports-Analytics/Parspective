@@ -8,6 +8,7 @@ import numpy as np
 
 from . import SCHEMA_VERSION, __version__
 from .config import AnalysisConfig, load_config
+from .metrics import stroke_tempo, tempo_summary, tempo_target
 from .phases import StrokePhases, detect_strokes
 from .pose import PoseSequence
 from .result import (
@@ -61,14 +62,22 @@ def analyze_pose(
         detection = detect_strokes(traj, config.phases)
         warnings.extend(detection.warnings)
         for i, s in enumerate(detection.strokes, start=1):
-            # Per-stroke metrics (metrics.py) are computed here and added to Stroke.
             strokes.append(
                 Stroke(
                     index=i,
                     phases=_phases_out(ts, s),
                     backswing_length_sw=round(s.backswing_length_sw, 3),
+                    tempo=stroke_tempo(s, config.tempo),
                 )
             )
+
+    fps_for_warning = 1000.0 / frame_interval if frame_interval else seq.fps
+    if strokes and fps_for_warning < config.tempo.low_fps_warning:
+        warnings.append(
+            f"The video is about {fps_for_warning:.0f} fps, so each frame is "
+            f"{1000 / fps_for_warning:.0f} ms apart. Event times are interpolated between "
+            f"frames, but recording at 60 fps or more gives more reliable tempo."
+        )
 
     return AnalysisResult(
         schema_version=SCHEMA_VERSION,
@@ -90,6 +99,8 @@ def analyze_pose(
             detection_rate=round(n_detected / seq.frame_count, 3) if seq.frame_count else 0.0,
         ),
         strokes=strokes,
+        tempo_summary=tempo_summary([s.tempo for s in strokes], config.tempo),
+        tempo_target=tempo_target(config.tempo),
         warnings=warnings,
     )
 

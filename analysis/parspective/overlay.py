@@ -1,4 +1,4 @@
-"""Overlay video: skeleton + stroke phase label (+ per-stroke metrics once added)."""
+"""Overlay video: skeleton + stroke phase label + tempo for each completed stroke."""
 
 from __future__ import annotations
 
@@ -76,7 +76,29 @@ def _hud_lines(result: AnalysisResult, t_ms: float) -> list[tuple[str, tuple]]:
         label = _phase_label(s, t_ms)
         if label:
             lines.append((f"Stroke {s.index}: {label}", _WHITE))
-    # Per-stroke metric lines (shown after each stroke's impact) are added here.
+    for s in result.strokes:
+        if s.phases.impact.time_ms <= t_ms:
+            tempo = s.tempo
+            colour = _GREEN if tempo.rating == "in_range" else _AMBER
+            lines.append(
+                (
+                    f"{s.index}. Tempo {tempo.ratio:.1f}:1  "
+                    f"({tempo.backswing_ms / 1000:.2f}s back / "
+                    f"{tempo.forward_swing_ms / 1000:.2f}s fwd)",
+                    colour,
+                )
+            )
+    last_impact = max((s.phases.impact.time_ms for s in result.strokes), default=None)
+    summary = result.tempo_summary
+    if last_impact is not None and t_ms >= last_impact and summary.consistency:
+        colour = _GREEN if summary.consistency == "consistent" else _AMBER
+        lines.append(
+            (
+                f"{summary.consistency.capitalize()}: avg {summary.ratio.mean:.1f}:1 "
+                f"(+/-{summary.ratio.sd:.2f})",
+                colour,
+            )
+        )
     return lines
 
 
@@ -86,7 +108,7 @@ def render_overlay(
     result: AnalysisResult,
     out_path: str | Path,
 ) -> None:
-    """Re-decode the video and write an H.264 MP4 with skeleton and phase annotations."""
+    """Re-decode the video and write an H.264 MP4 with skeleton and tempo annotations."""
     import imageio_ffmpeg
 
     video = cv2.VideoCapture(str(video_path))

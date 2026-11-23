@@ -41,9 +41,28 @@ Code: [`analysis/parspective/phases.py`](../analysis/parspective/phases.py). A v
 
 All event times are **interpolated between frames** (linear interpolation of the threshold crossing). At 30 fps a frame is 33 ms, which is about 7% of a typical forward swing, so whole-frame events would be too coarse.
 
-**Why the top is a midpoint.** Many golfers pause briefly at the top. During a pause the furthest-back frame is essentially random: on the sample video, the MediaPipe *lite* and *full* models picked frames 200 ms apart for the same stroke, which moved 200 ms from the backswing to the forward swing. The midpoint of the pause is stable. On a smooth 2:1 stroke with no pause it lands exactly on the reversal.
+**Why the top is a midpoint.** Many golfers pause briefly at the top. During a pause the furthest-back frame is essentially random: on the sample video, the MediaPipe *lite* and *full* models picked frames 200 ms apart for the same stroke, which moved the tempo ratio from 2.3 to 1.4. The midpoint of the pause is stable. On a smooth 2:1 stroke with no pause it lands exactly on the reversal.
 
 A stroke is **rejected with a warning** (not silently dropped) if: it starts before the recording, it never returns to address, its backswing or forward swing is outside the plausible range (`phases.min/max_*_ms`), or the hands were untracked for more than `signal.max_gap_ms` between takeaway and impact.
+
+### Tempo (US 06)
+Code: [`analysis/parspective/metrics.py`](../analysis/parspective/metrics.py).
+
+| Field | Definition |
+|-------|-----------|
+| `backswing_ms` | takeaway → top |
+| `forward_swing_ms` | top → impact |
+| `total_ms` | takeaway → impact |
+| `ratio` | `backswing_ms / forward_swing_ms` (2.0 means 2:1) |
+| `transition_ms` | backswing stops → forward swing starts (the pause at the top, plus the slow motion on either side of it) |
+| `rating` | `in_range` if `ratio` is within `tempo.target_ratio ± tempo.target_tolerance` (2.0 ± 0.2), otherwise `low` (backswing quick relative to the forward swing) or `high` |
+
+**Consistency** (`tempo_summary`), across all strokes in one video: mean, sample SD, min and max of each field. With 2 or more strokes, the verdict is `consistent` if the ratio's SD is ≤ `tempo.consistency_max_ratio_sd` (0.15), else `variable`. With one stroke there's no verdict, and the user is told to record several strokes in a row.
+
+**Known biases and accuracy** (from `analysis/tests/test_phases.py` and the sample video):
+- The 10% takeaway threshold starts the clock slightly after the hands first move: about 3% of the backswing on a smooth stroke. This lowers the ratio by about 0.06 at 2:1. The bias is the same for every stroke, so it doesn't affect consistency, but it does matter when comparing with Parspective (SP 02).
+- On synthetic strokes with realistic landmark noise, the ratio error averages about 0.07.
+- On the sample video (29.5 fps), the lite and full models give ratios that differ by about 0.04 on average and by up to 0.1 on a single stroke. Treat differences between strokes smaller than about 0.1 as noise. **Record at 60 fps or more** where possible. Below `tempo.low_fps_warning` (50 fps) the result carries a warning.
 
 ## What the face-on view cannot measure well
 _(Expanded in Phase 6, `docs/limitations.md`.)_

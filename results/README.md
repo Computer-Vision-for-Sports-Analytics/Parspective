@@ -5,8 +5,8 @@
 ```
 results/
   putt/
-    result.json    # strokes, phases and metrics (schema: analysis/parspective/result.py)
-    overlay.mp4    # skeleton + phase label, H.264
+    result.json    # tempo per stroke, consistency summary, phases (schema: analysis/parspective/result.py)
+    overlay.mp4    # skeleton + phase label + tempo, H.264
 ```
 
 Running a video again overwrites its folder. Use `--out-dir`, `--out` or `--overlay` to write somewhere else, and `--no-overlay` to skip the video.

@@ -25,23 +25,34 @@ def _main() -> None:
 
 
 def format_report(result: AnalysisResult) -> str:
-    """Human-readable report for the terminal."""
+    """Human-readable tempo report for the terminal."""
     v = result.video
     lines = [
         f"{v.filename}: {result.hand}-handed, {v.frame_count} frames, "
         f"{v.duration_ms / 1000:.1f} s, {v.fps:.1f} fps "
         f"(pose found in {result.pose.detection_rate:.0%} of frames)",
         "",
-        f"{len(result.strokes)} stroke(s) found.",
     ]
     if result.strokes:
-        events = ("address", "takeaway", "top", "impact", "finish")
-        lines.append(f"{'Stroke':<8}" + "".join(f"{e.capitalize():>10}" for e in events))
+        lines.append(
+            f"{'Stroke':<8}{'Backswing':>11}{'Forward':>10}{'Total':>9}{'Tempo':>9}  Rating"
+        )
         for s in result.strokes:
-            times = [getattr(s.phases, e) for e in events]
-            cells = "".join(f"{t.time_ms / 1000:>9.2f}s" if t else f"{'-':>10}" for t in times)
-            lines.append(f"{s.index:<8}{cells}")
-        # Per-stroke metric lines are added here.
+            t = s.tempo
+            lines.append(
+                f"{s.index:<8}{t.backswing_ms / 1000:>10.2f}s{t.forward_swing_ms / 1000:>9.2f}s"
+                f"{t.total_ms / 1000:>8.2f}s{t.ratio:>7.2f}:1  {t.rating.replace('_', ' ')}"
+            )
+        lines.append("")
+        for s in result.strokes:
+            lines.append(f"  {s.index}. {s.tempo.message}")
+        lines.append("")
+    lines.append(result.tempo_summary.message)
+    target = result.tempo_target
+    lines.append(
+        f"(Provisional target {target.ratio:.1f}:1 +/- {target.tolerance:.1f}; "
+        f"consistent if ratio SD <= {target.consistency_max_ratio_sd:.2f}.)"
+    )
     if result.warnings:
         lines.append("")
         lines.extend(f"Warning: {w}" for w in result.warnings)
@@ -75,7 +86,7 @@ def analyze(
         Path | None, typer.Option(exists=True, dir_okay=False, help="Explicit .task model file.")
     ] = None,
 ) -> None:
-    """Analyze one putting video: detect strokes and their phases.
+    """Analyze one putting video and report stroke tempo.
 
     By default the result JSON and overlay video are written to results/<video name>/.
     """

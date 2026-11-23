@@ -1,4 +1,4 @@
-"""Phase detection against synthetic strokes with known timing."""
+"""Phase detection and tempo against synthetic strokes with known timing."""
 
 import numpy as np
 import pytest

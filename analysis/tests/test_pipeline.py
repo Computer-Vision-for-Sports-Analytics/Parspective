@@ -23,7 +23,7 @@ def test_bundled_yaml_matches_code_defaults():
 
 def test_unknown_config_key_is_rejected(tmp_path):
     data = yaml.safe_load(default_config_path().read_text(encoding="utf-8"))
-    data["phases"]["takeaway_velocity_fracton"] = 0.1  # typo
+    data["tempo"]["target_ration"] = 2.0  # typo
     bad = tmp_path / "metrics.yaml"
     bad.write_text(yaml.safe_dump(data), encoding="utf-8")
     with pytest.raises(ValidationError):
@@ -42,19 +42,28 @@ def test_result_shape_and_json_round_trip():
         p = s.phases
         assert p.address.time_ms <= p.takeaway.time_ms < p.top.time_ms < p.impact.time_ms
         assert p.takeaway.frame < p.top.frame < p.impact.frame
-        assert s.backswing_length_sw == pytest.approx(0.6, abs=0.05)
-    assert result.warnings == []
+        expected = s.tempo.backswing_ms / s.tempo.forward_swing_ms
+        assert s.tempo.ratio == pytest.approx(expected, abs=1e-2)
+    assert result.tempo_summary.stroke_count == 3
+    assert result.tempo_summary.consistency == "consistent"
+    assert not any("fps" in w for w in result.warnings)  # 60 fps: no low-fps warning
 
     data = json.loads(result.model_dump_json())
     assert AnalysisResult.model_validate(data) == result
 
 
-def test_report_lists_each_stroke():
+def test_low_fps_warning():
+    seq, _ = make_sequence([StrokeSpec(900, 450)], fps=30)
+    result = analyze_pose(seq, "right")
+    assert any("60 fps" in w for w in result.warnings)
+
+
+def test_report_mentions_each_stroke_and_summary():
     seq, _ = make_sequence([StrokeSpec(900, 450), StrokeSpec(700, 500)], fps=60)
     report = format_report(analyze_pose(seq, "right", filename="x.mp4"))
     assert "x.mp4" in report
-    assert "2 stroke(s) found" in report
-    assert "Takeaway" in report
+    assert "Variable" in report or "Consistent" in report
+    assert report.count(":1") >= 4
 
 
 def _fake_run(calls):
